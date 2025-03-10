@@ -1,4 +1,4 @@
-import { createClient, type Client } from "@libsql/client";
+import { createPool, type Pool } from "mysql2/promise";
 import { drizzle } from "drizzle-orm/libsql";
 
 import { env } from "~/env";
@@ -9,11 +9,23 @@ import * as schema from "./schema";
  * update.
  */
 const globalForDb = globalThis as unknown as {
-  client: Client | undefined;
+  conn: Pool | undefined;
 };
 
-export const client =
-  globalForDb.client ?? createClient({ url: env.DATABASE_URL });
-if (env.NODE_ENV !== "production") globalForDb.client = client;
+const conn =
+  globalForDb.conn ??
+  createPool({
+    host: env.SINGLESTORE_HOST,
+    user: env.SINGLESTORE_USER,
+    password: env.SINGLESTORE_PASS,
+    database: env.SINGLESTORE_DB_NAME,
+    port: parseInt(env.SINGLESTORE_PORT),
+    ssl: {},
+    maxIdle: 0,
+  });
 
-export const db = drizzle(client, { schema });
+if (env.NODE_ENV !== "production") globalForDb.conn = conn;
+
+conn.addListener("error", (err) => {
+  console.error("Database connection error: ", err);
+});
